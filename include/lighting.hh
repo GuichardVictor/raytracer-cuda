@@ -1,30 +1,156 @@
 #pragma once
 
-#include <curand_kernel.h>
+#include <vector>
+#include <memory>
 
 #include "light.hh"
 #include "vector3.hh"
 #include "color.hh"
 #include "shape.hh"
-#include "array.hh"
 
 
-namespace Lighting
-{
-    __device__ Color getLightingAll(const Shape& object, const Vector3& point,
-                                    const Vector3& normal, const Vector3& view,
-                                    Array<Light>* lights,
-                                    Array<Shape>* objects,
-                                    curandState* r_state);
-    
-    __device__  bool getShadow(const Vector3& point, const Light& light,
-                               Array<Shape>* objects);
-    __device__  float getShadowFactor(const Vector3& point, const Light& light,
-                                 Array<Shape>* objects,
-                                 curandState* r_state);
+class Lighting
+{ 
+public:
+    static Color getLightingSimple(const Shape& object, const Vector3& point,
+                                   const Vector3& normal, const Vector3& view,
+                                   const std::vector<std::shared_ptr<Light>>& lights,
+                                   const std::vector<std::shared_ptr<Shape>>& objects)
+    {
+        Color ambient = object.color;
+        Color rayColor = ambient * object.ka;
 
+        // Compute illumination with shadows
+        for(auto it = lights.begin(); it != lights.end(); it++)
+        {
+            auto light = *it;
+            bool in_shadow = getShadow(point, *light, objects);
+            if (in_shadow)
+                continue;
 
-    __device__ Color getLighting(const Shape& object, const Vector3& point,
-                                 const Vector3& normal, const Vector3& view,
-                                 Light* light);
-} // namespace Lighting;
+            rayColor += getLighting(object, point, normal, view, light);
+        }
+
+        return rayColor;
+    }
+
+    static Color getLighting(const Shape& object, const Vector3& point,
+                             const Vector3& normal, const Vector3& view,
+                             const std::vector<std::shared_ptr<Light>>& lights,
+                             const std::vector<std::shared_ptr<Shape>>& objects)
+    {
+        Color ambient = object.color;
+        Color rayColor = ambient * object.ka;
+
+        // Compute illumination with shadows
+        for(auto& light : lights)
+        {
+            float shadowFactor = getShadowFactor(point, *light, objects);
+            rayColor += getLighting(object, point, normal, view, light) * (1.0 - shadowFactor);
+        }
+
+        return rayColor;
+    }
+
+    static bool getShadow(const Vector3& point, const Light& light,
+                          const std::vector<std::shared_ptr<Shape>>& objects)
+    {
+        Vector3 shadowRayDirection = light.position - point;
+        shadowRayDirection.normalize();
+        Ray shadowRay(point, shadowRayDirection);
+
+        for(auto it = objects.begin(); it != objects.end(); it++)
+        {
+            float t0 = INFINITY;
+            float t1 = INFINITY;
+            auto object = *it;
+            if(object->intersect(shadowRay, t0, t1))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static float getShadowFactor(const Vector3& point, const Light& light,
+                                 const std::vector<std::shared_ptr<Shape>>& objects)
+    { 
+        if(light.type != Light::Type::Area)
+        {
+            return getShadow(point, light, objects) ? 1.0 : 0.0;
+        }
+
+        int shadowCount = 0;
+        Vector3 start(light.position.x - (light.width / 2),
+                      light.position.y - (light.height / 2),
+                      light.position.z);
+        Vector3 step(light.width / light.samples,
+                     light.height / light.samples,
+                     0);
+        Vector3 lightSample;
+        Vector3 jitter;
+
+        for(int i = 0; i < light.samples; i++)
+        {
+            for(int j = 0; j < light.samples; j++)
+            {
+                jitter = Vector3::random() * step - (step / 2.0);
+                lightSample = Vector3(start.x + (step.x * i) + jitter.x,
+                                      start.y + (step.y * j) + jitter.y,
+                                      start.z);
+
+                Vector3 shadowRayDirection = lightSample - point;
+                shadowRayDirection.normalize();
+                Ray shadowRay(point, shadowRayDirection);
+
+                bool inShadow = false;
+                for(auto it = objects.begin(); it != objects.end(); it++)
+                {
+                    auto obj = *it;
+                    float t0 = INFINITY; float t1 = INFINITY;
+                    if(obj->intersect(shadowRay, t0, t1)) {
+                        inShadow = true;
+                        break;
+                    }
+                }
+
+                if(inShadow)
+                    shadowCount++;
+            }
+        }
+
+        return shadowCount / (float) light.samples;  // Light Factor
+    }
+
+    static Color getLighting(const Shape& object, const Vector3& point,
+                             const Vector3& normal, const Vector3& view,
+                             const std::shared_ptr<Light>& light) {
+      Color rayColor;
+
+      // Create diffuse color
+      Vector3 N = normal;
+      
+      Vector3 L = light->position - point;
+      float distance = L.length();
+      L.normalize();
+      float attenuate = light->attenuate(distance);
+
+      float NdotL = N.dot(L);
+      float intensity = std::max(0.0f, NdotL); 
+      Color diffuse = object.color * light->intensity * intensity * attenuate;
+      
+      // Create specular color
+      Vector3 V = view;
+      Vector3 H = L + V;
+      H.normalize();
+
+      float shinniness = object.shininess;
+      float NdotH = N.dot(H);
+      float specularIntensity = std::pow(std::max(0.0f, NdotH), shinniness);
+      Color specular = object.color_specular * light->intensity * specularIntensity * attenuate;
+
+      rayColor = diffuse * object.kd + specular * object.ks;   
+
+      return rayColor;
+    }
+};

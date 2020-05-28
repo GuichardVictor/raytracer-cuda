@@ -1,30 +1,34 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "shape.hh"
 #include "light.hh"
 #include "color.hh"
-#include "array.hh"
 
 class Scene
 {
 public:
-    __host__ __device__
-    Scene() {}
-
-    __host__ __device__
-    Scene(Array<Shape>* objs,
-          Array<Light>* _lights,
+    Scene() = default;
+    Scene(const std::vector<std::shared_ptr<Shape>>& objs,
+          const std::vector<std::shared_ptr<Light>>& _lights,
           const Color& background = Color(),
           const AmbientLight& ambient = AmbientLight())
         : objects{objs}, lights(_lights), backgroundColor{background}, ambientLight{ambient}
     {}
 
-    __host__ __device__ void setAmbientLight(const AmbientLight& l) { ambientLight = l; }
-    __host__ __device__ void setBackgroundColor(const Color& c) { backgroundColor = c; }
+    void addLight(const std::shared_ptr<Light>& _light)
+    { lights.push_back(_light); }
+
+    void addObject(const std::shared_ptr<Shape>& _object)
+    { objects.push_back(_object); }
+
+    void setAmbientLight(const AmbientLight& l) { ambientLight = l; }
 
 public:
-    Array<Shape>* objects;
-    Array<Light>* lights;
+    std::vector<std::shared_ptr<Shape>> objects;
+    std::vector<std::shared_ptr<Light>> lights;
 
     Color backgroundColor;
     AmbientLight ambientLight;

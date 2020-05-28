@@ -15,17 +15,17 @@ public:
         Area
     };
 
-    __host__ __device__ Light() {}
+    Light() = default;
 
-    __host__ __device__ Light(const Vector3& _intensity)
+    Light(Vector3 _intensity)
         : position{}, intensity{_intensity}
     {}
 
-    __host__ __device__ Light(const Vector3& _position, const Vector3& _intensity)
+    Light(Vector3 _position, Vector3 _intensity)
         : position{_position}, intensity{_intensity}
     {}
 
-    __device__ virtual float attenuate(const float) const { return 1.0; };
+    virtual float attenuate(const float) const { return 1.0; };
 
 public:
     Vector3 position;
@@ -40,64 +40,59 @@ public:
 class AmbientLight : public Light
 {
 public:
-    __host__ __device__ AmbientLight()
+    AmbientLight()
         : Light{}
     { type = Light::Type::Ambient; }
-
-    __host__ __device__ AmbientLight(const Vector3& _intensity)
+    AmbientLight(Vector3 _intensity)
         : Light(_intensity)
     { type = Light::Type::Ambient; }
 
-    __device__ float attenuate(const float) const override { return 1.0f; }
+    float attenuate(const float) const override { return 1.0; }
 };
 
 class DirectionalLight : public Light
 {
 public:
-    __host__ __device__ DirectionalLight()
+    DirectionalLight()
         : Light{}
     { type = Light::Type::Directional; }
-    
-    __host__ __device__ DirectionalLight(const Vector3& _position, const Vector3& _intensity)
+    DirectionalLight(Vector3 _position, Vector3 _intensity)
         : Light(_position, _intensity)
     { type = Light::Type::Directional; }
     
-    __device__ float attenuate(const float) const override { return 1.0; }
+    float attenuate(const float) const override { return 1.0; }
 };
 
 class PointLight : public Light
 {
 public:
-    __host__ __device__ PointLight()
+    PointLight()
         : Light{}
     { type = Light::Type::Point; }
-
-    __host__ __device__ PointLight(const Vector3& _position, const Vector3& _intensity)
+    PointLight(Vector3 _position, Vector3 _intensity)
         : Light(_position, _intensity)
     { type = Light::Type::Point; }
 
-    __device__ float attenuate(const float r) const override { return 1.0 / (r * r); }
+    float attenuate(const float r) const override { return 1.0 / (r * r); }
 };
 
 class SpotLight : public Light
 {
 public:
-    __host__ __device__ SpotLight()
+    SpotLight()
         : Light{}
     { type = Light::Type::Spot; }
-
-    __host__ __device__ SpotLight(const Vector3& _position, const Vector3& _intensity)
+    SpotLight(Vector3 _position, Vector3 _intensity)
         : Light(_position, _intensity)
     { type = Light::Type::Spot; }
 
-    __device__ float attenuate(const float) const override { return 1.0; }
-    __device__ float attenuate(const Vector3& Vobj, const Vector3& Vlight) const { return Vobj.dot(Vlight); }
+    float attenuate(Vector3 Vobj, Vector3 Vlight) const { return Vobj.dot(Vlight); }
 };
 
 class AreaLight : public Light
 {
 public:
-    __host__ __device__ AreaLight()
+    AreaLight()
         : Light{}
     {
       type = Light::Type::Area;
@@ -106,7 +101,7 @@ public:
       height = 4;
     }
 
-    __host__ __device__ AreaLight(Vector3 _position, Vector3 _intensity)
+    AreaLight(Vector3 _position, Vector3 _intensity)
         : Light(_position, _intensity)
     {
       type = Light::Type::Area;
@@ -115,5 +110,5 @@ public:
       height = 4;
     }
 
-    __device__ float attenuate(const float) const override { return 1.0; }
+    float attenuate(const float) const override { return 1.0; }
 };

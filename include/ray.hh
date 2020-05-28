@@ -1,13 +1,14 @@
 #pragma once
 
-#include "vector3.hh"
-
 class Ray
 {
 public:
-    __host__ __device__ Ray(const Vector3& _origin, const Vector3& _direction)
+    Ray(const Vector3& _origin, const Vector3& _direction)
         : origin{_origin}, direction{_direction}
     {}
+
+    Vector3 origin_get() { return origin; }
+    Vector3 direction_get() { return direction; }
 
 public:
     Vector3 origin;
