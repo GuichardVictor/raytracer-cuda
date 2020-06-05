@@ -4,6 +4,8 @@
 
 #include <stdio.h>
 
+#define MAX_DEPTH 1
+
 namespace Lighting
 {
     __device__ Color getLightingAll(const Shape& object, const Vector3& point,
@@ -212,95 +214,138 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     Shape* hit = nullptr;
     float tnear = INFINITY;
 
-    for (size_t i = 0; i < scene->objects->count; i++)
+    const size_t max_index = (1 << (5 + 1)) - 1;
+
+    Ray *ray_stack = (Ray *)malloc(max_index * sizeof(Ray));
+    int *hit_index_stack = (int *)malloc(max_index * sizeof(int));
+    Color *color_stack = (Color *)malloc(max_index * sizeof(Color)); 
+    
+    //fill arrays
+    for (size_t i = 0; i < max_index; i++)
     {
-        float t0 = INFINITY;
-        float t1 = INFINITY;
-        auto obj = scene->objects->list[i];
-        if (obj->intersect(ray, t0, t1))
+        ray_stack[i] = Ray(ray.origin, ray.direction);
+        hit_index_stack[i] = -1;
+        color_stack[i] = Color(0.0f);
+    } 
+
+    //Ray *ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
+    //int *hit_index_stack[allocating_size] = { -1 }  ;
+    //Color *color_stack[allocating_size] = {Color(0.0f)};
+
+    ray_stack[0] = ray;
+
+    for(size_t stack_index = 0; stack_index < max_index; stack_index++)
+    {
+        if(hit_index_stack[stack_index / 2] == -1)
         {
-            if (t0 < 0) { t0 = t1; }
-            if (t0 < tnear)
+            continue;
+        }
+
+        Ray new_ray = ray_stack[stack_index];
+
+        int hit_index = -1;
+        for (size_t i = 0; i < scene->objects->count; i++)
+        {
+            float t0 = INFINITY;
+            float t1 = INFINITY;
+            auto obj = scene->objects->list[i];
+            if (obj->intersect(new_ray, t0, t1))
             {
-                tnear = t0;
-                hit = obj;
+                if (t0 < 0) { t0 = t1; }
+                if (t0 < tnear)
+                {
+                    tnear = t0;
+                    hit = obj;
+                    hit_index = i;
+                }
             }
         }
-    }
 
-    if (hit == nullptr)
-    {
-        return (depth < 1) ? Color(0.0f) : Color(0.0f);
-    }
 
-    Vector3 hitPoint = ray.origin + ray.direction * tnear;
-    Vector3 N = hit->getNormal(hitPoint);
-    N.normalize();
-    Vector3 V = camera->position - hitPoint;
-    V.normalize();
-
-    // Compute Color with all lights
-    rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
-
-    if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-    {
-        printf("|ERROR|");
-        //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-    }
-
-    float bias = 1e-4f;
-    bool inside = false;
-
-    if (ray.direction.dot(N) > 0)
-    {
-        N = -N;
-        inside = true;
-    }
-
-    // not transparent or depth == MAX RAY DEPTH
-    if ((hit->transparency <= 0 && hit->reflectivity <= 0) || depth >= max_ray_depth)
-    {
-        return rayColor;
-    }
-
-    // Compute Reflection Ray and Color 
-    Vector3 R = ray.direction - N * 2 * ray.direction.dot(N);
-    R = R + Vector3::random(r_state) * hit->glossiness;
-    R.normalize();
-
-    Ray rRay(hitPoint + N * bias, R);
-    Color reflectionColor = trace(rRay, depth + 1, r_state); //* VdotR;
-    Color refractionColor = Color();
-
-    if (hit->transparency <= 0)
-    {
-        if (isnan(reflectionColor.r) || isnan(reflectionColor.g) || isnan(reflectionColor.b))
+        hit_index_stack[stack_index] = hit_index;
+        if(hit == nullptr)
         {
-            printf("|ERROR REFLECTION|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
+            continue;
         }
+
+        Vector3 hitPoint = new_ray.origin + new_ray.direction * tnear;
+        Vector3 N = hit->getNormal(hitPoint);
+        N.normalize();
+        Vector3 V = camera->position - hitPoint;
+        V.normalize();
+
+        // Compute Color with all lights
+        rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
+
         if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
         {
-            printf("|~~ABCDEFGH~~|");
+            printf("|ERROR|");
             //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
         }
-        return rayColor + (reflectionColor * hit->reflectivity);
+
+        float bias = 1e-4f;
+        bool inside = false;
+
+        if (new_ray.direction.dot(N) > 0)
+        {
+            N = -N;
+            inside = true;
+        }
+
+
+        
+        // not transparent or depth == MAX RAY DEPTH
+
+        if (hit->transparency <= 0 && hit->reflectivity <= 0)
+        {
+            continue;
+        }
+
+        Vector3 R = ray.direction - N * 2 * ray.direction.dot(N);
+        R = R + Vector3::random(r_state) * hit->glossiness;
+        R.normalize();
+
+        Ray rRay(hitPoint + N * bias, R);
+
+        // Compute Refracted Ray (transmission ray) and Color
+        float ni = 1.0;
+        float nt = 1.1;
+        float nit = ni / nt;
+        if (inside) { nit = 1 / nit; }
+        float costheta = - N.dot(ray.direction);
+        float k = 1 - nit * nit * (1 - costheta * costheta);
+        Vector3 T = ray.direction * nit + N * (nit * costheta - sqrtf(k));
+        T = T + Vector3::random(r_state) * hit->glossy_transparency;
+        T.normalize();
+        Ray refractionRay(hitPoint - N * bias, T);
+
+        //set new rays and color for next 'recursion'
+        color_stack[stack_index] = rayColor;
+        if(stack_index < ((max_index - 1) / 2))
+        {
+            ray_stack[2 * stack_index] = rRay;
+            ray_stack[2 * stack_index + 1] = refractionRay;
+        }
     }
 
-    // Compute Refracted Ray (transmission ray) and Color
-    float ni = 1.0;
-    float nt = 1.1;
-    float nit = ni / nt;
-    if (inside) { nit = 1 / nit; }
-    float costheta = - N.dot(ray.direction);
-    float k = 1 - nit * nit * (1 - costheta * costheta);
-    Vector3 T = ray.direction * nit + N * (nit * costheta - sqrtf(k));
-    T = T + Vector3::random(r_state) * hit->glossy_transparency;
-    T.normalize();
-
-    Ray refractionRay(hitPoint - N * bias, T);
-    refractionColor = trace(refractionRay, depth + 1, r_state);
-    return (reflectionColor * hit->reflectivity) + (refractionColor * hit->transparency);
+    for(size_t i = max_index - 1; i > 1; i -= 2)
+    {
+        int parent_index = i / 2;
+        if(hit_index_stack[parent_index] != -1)
+        {
+            auto hit = scene->objects->list[hit_index_stack[parent_index]];
+            if(hit->transparency <= 0)
+            {
+                color_stack[parent_index] = color_stack[parent_index] + (color_stack[i - 1] * hit->reflectivity); 
+                continue;
+            }
+            color_stack[parent_index] = (color_stack[i - 1] * hit->reflectivity) + (color_stack[i] * hit->transparency);
+        }
+    }
+    free(hit_index_stack);
+    free(color_stack);
+    free(ray_stack);
+    return color_stack[0];
 }
 
 __device__ void simple_scene(Scene** scene_ptr)

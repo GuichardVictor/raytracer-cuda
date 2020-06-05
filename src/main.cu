@@ -85,7 +85,7 @@ int main()
         for (int i = 0; i < width; i++) {
             size_t pixel_index = j * width + i;
             auto color = frameBuffer[pixel_index];
-            //color = color.clamp();
+            color = color.clamp();
             int ir = int(color.r);
             int ig = int(color.g);
             int ib = int(color.b);
