@@ -5,6 +5,8 @@
 #include <stdio.h>
 
 #define MAX_DEPTH 1
+#define max_depth_val 7
+#define allocating_size (1 << (max_depth_val)) - 1
 
 namespace Lighting
 {
@@ -207,40 +209,26 @@ __device__ Vector3 Sphere::getNormal(const Vector3& hitPosition)
     return (hitPosition - center) / radius;
 }
 
-__device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state)
+
+__device__ Color Renderer::trace(const Ray &ray, curandState* r_state)
 {
     // Transform recursive method into interative
-    Color rayColor = Color(0.0f);
-    Shape* hit = nullptr;
-    float tnear = INFINITY;
-
-    const size_t max_index = (1 << (5 + 1)) - 1;
-
-    Ray *ray_stack = (Ray *)malloc(max_index * sizeof(Ray));
-    int *hit_index_stack = (int *)malloc(max_index * sizeof(int));
-    Color *color_stack = (Color *)malloc(max_index * sizeof(Color)); 
-    
-    //fill arrays
-    for (size_t i = 0; i < max_index; i++)
-    {
-        ray_stack[i] = Ray(ray.origin, ray.direction);
-        hit_index_stack[i] = -1;
-        color_stack[i] = Color(0.0f);
-    } 
-
-    //Ray *ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
-    //int *hit_index_stack[allocating_size] = { -1 }  ;
-    //Color *color_stack[allocating_size] = {Color(0.0f)};
-
+    Ray ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
+    int hit_index_stack[allocating_size] = { -1 }  ;
+    Color color_stack[allocating_size] = {Color(0.0f)};
     ray_stack[0] = ray;
-
-    for(size_t stack_index = 0; stack_index < max_index; stack_index++)
+    hit_index_stack[0] = 0;
+    int threshold_last_depth = 1 << (max_depth_val - 1);
+    for(size_t stack_index = 0; stack_index < allocating_size; stack_index++)
     {
-        if(hit_index_stack[stack_index / 2] == -1)
+        if(hit_index_stack[stack_index / 2 - 1] == -1)
         {
             continue;
         }
 
+        Color rayColor = Color(0.0f);
+        Shape* hit = nullptr;
+        float tnear = INFINITY;
         Ray new_ray = ray_stack[stack_index];
 
         int hit_index = -1;
@@ -263,7 +251,7 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
 
 
         hit_index_stack[stack_index] = hit_index;
-        if(hit == nullptr)
+        if(hit_index == -1)
         {
             continue;
         }
@@ -283,6 +271,18 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
             //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
         }
 
+        color_stack[stack_index] = rayColor;
+
+        
+        // not transparent or depth == MAX RAY DEPTH
+
+        if ((hit->transparency <= 0 && hit->reflectivity <= 0) || stack_index > threshold_last_depth)
+        {
+            hit_index_stack[stack_index] = -1;
+            continue;
+        }
+
+
         float bias = 1e-4f;
         bool inside = false;
 
@@ -292,16 +292,7 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
             inside = true;
         }
 
-
-        
-        // not transparent or depth == MAX RAY DEPTH
-
-        if (hit->transparency <= 0 && hit->reflectivity <= 0)
-        {
-            continue;
-        }
-
-        Vector3 R = ray.direction - N * 2 * ray.direction.dot(N);
+        Vector3 R = new_ray.direction - N * 2 * new_ray.direction.dot(N);
         R = R + Vector3::random(r_state) * hit->glossiness;
         R.normalize();
 
@@ -312,28 +303,23 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
         float nt = 1.1;
         float nit = ni / nt;
         if (inside) { nit = 1 / nit; }
-        float costheta = - N.dot(ray.direction);
+        float costheta = - N.dot(new_ray.direction);
         float k = 1 - nit * nit * (1 - costheta * costheta);
-        Vector3 T = ray.direction * nit + N * (nit * costheta - sqrtf(k));
+        Vector3 T = new_ray.direction * nit + N * (nit * costheta - sqrtf(k));
         T = T + Vector3::random(r_state) * hit->glossy_transparency;
         T.normalize();
         Ray refractionRay(hitPoint - N * bias, T);
 
         //set new rays and color for next 'recursion'
-        color_stack[stack_index] = rayColor;
-        if(stack_index < ((max_index - 1) / 2))
-        {
-            ray_stack[2 * stack_index] = rRay;
-            ray_stack[2 * stack_index + 1] = refractionRay;
-        }
+        ray_stack[2 * stack_index + 1] = rRay;
+        ray_stack[2 * stack_index + 2] = refractionRay;
     }
-
-    for(size_t i = max_index - 1; i > 1; i -= 2)
+    for(int i = allocating_size - 1; i > 0; i -= 2)
     {
-        int parent_index = i / 2;
+        int parent_index = i / 2 - 1;
         if(hit_index_stack[parent_index] != -1)
         {
-            auto hit = scene->objects->list[hit_index_stack[parent_index]];
+            Shape* hit = scene->objects->list[hit_index_stack[parent_index]];
             if(hit->transparency <= 0)
             {
                 color_stack[parent_index] = color_stack[parent_index] + (color_stack[i - 1] * hit->reflectivity); 
@@ -342,12 +328,9 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
             color_stack[parent_index] = (color_stack[i - 1] * hit->reflectivity) + (color_stack[i] * hit->transparency);
         }
     }
-    free(hit_index_stack);
-    free(color_stack);
-    free(ray_stack);
-    return color_stack[0];
+    Color ret = color_stack[0];
+    return ret;
 }
-
 __device__ void simple_scene(Scene** scene_ptr)
 {
     *scene_ptr = new Scene();
@@ -415,7 +398,7 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
-    *renderer = new Renderer(width, height, *scene, *cam, 3);
+    *renderer = new Renderer(width, height, *scene, *cam, 7);
 }
 
 __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)
@@ -440,7 +423,7 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        framebuffer[index] += renderer->trace(ray, 0, &local_rand_state) * ds;
+        framebuffer[index] += renderer->trace(ray, &local_rand_state) * ds;
     }
 
     random_states[index] = local_rand_state;

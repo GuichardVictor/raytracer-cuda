@@ -16,7 +16,7 @@ public:
         : width(_width), height(_height), scene(_scene), camera(_camera), max_ray_depth(_max_ray_depth), ray_per_pixel(_ray_per_pixel)
     {}
 
-    __device__ Color trace(const Ray &ray, int depth, curandState* r_state);
+    __device__ Color trace(const Ray &ray, curandState* r_state);
 
 public:
     int width;
