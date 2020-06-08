@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 #define MAX_DEPTH 1
-#define max_depth_val 10
-#define allocating_size (1 << (max_depth_val)) - 1
+#define max_depth_val 7
+#define allocating_size (1 << (max_depth_val))
 
 namespace Lighting
 {
@@ -214,29 +214,23 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
                                        Ray* ray_stack, int* hit_index_stack, Color* color_stack)
 {
     // Transform recursive method into interative
-    //Ray ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
-    //int hit_index_stack[allocating_size] = { -1 };
-    bool refraction_ray_stack[allocating_size] = { true };
-    //Color color_stack[allocating_size] = {Color(0.0f)};
-    ray_stack[0] = ray;
+
+    ray_stack[1] = ray;
+    hit_index_stack[1] = 0;
     hit_index_stack[0] = 0;
-    int threshold_last_depth = 1 << (max_depth_val - 1);
-    for(size_t stack_index = 0; stack_index < allocating_size; stack_index++)
+    int threshold_last_depth = 1 << (max_depth_val - 1) - 1;
+    for(size_t stack_index = 1; stack_index < allocating_size; stack_index++)
     {
-        if(hit_index_stack[stack_index / 2 - 1] == -1)
+        int parent_index = stack_index / 2;
+        if(hit_index_stack[parent_index] == -1)
         {
-            continue;
-        }
-        if(!refraction_ray_stack[stack_index / 2 - 1] && stack_index % 2 == 1)
-        {
-            hit_index_stack[stack_index] = -1;
             continue;
         }
 
         Color rayColor = Color(0.0f);
         Shape* hit = nullptr;
         float tnear = INFINITY;
-        Ray new_ray = ray_stack[stack_index];
+        const Ray& new_ray = ray_stack[stack_index];
 
         int hit_index = -1;
         for (size_t i = 0; i < scene->objects->count; i++)
@@ -289,11 +283,6 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
             continue;
         }
 
-        if(hit->transparency <= 0)
-        {
-            refraction_ray_stack[stack_index] = false;
-        }
-
         float bias = 1e-4f;
         bool inside = false;
 
@@ -322,12 +311,12 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
         Ray refractionRay(hitPoint - N * bias, T);
 
         //set new rays and color for next 'recursion'
-        ray_stack[2 * stack_index + 1] = rRay;
-        ray_stack[2 * stack_index + 2] = refractionRay;
+        ray_stack[2 * stack_index] = rRay;
+        ray_stack[2 * stack_index + 1] = refractionRay;
     }
-    for(int i = allocating_size - 1; i > 0; i -= 2)
+    for(int i = allocating_size - 1; i > 1; i -= 2)
     {
-        int parent_index = i / 2 - 1;
+        int parent_index = i / 2;
         if(hit_index_stack[parent_index] != -1)
         {
             Shape* hit = scene->objects->list[hit_index_stack[parent_index]];
@@ -339,7 +328,7 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
             color_stack[parent_index] = (color_stack[i - 1] * hit->reflectivity) + (color_stack[i] * hit->transparency);
         }
     }
-    Color ret = color_stack[0];
+    Color ret = color_stack[1];
     return ret;
 }
 __device__ void simple_scene(Scene** scene_ptr)
