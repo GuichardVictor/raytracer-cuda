@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_DEPTH 1
-#define max_depth_val 7
+#define max_depth_val 10
 #define allocating_size (1 << (max_depth_val)) - 1
 
 namespace Lighting
@@ -210,12 +210,14 @@ __device__ Vector3 Sphere::getNormal(const Vector3& hitPosition)
 }
 
 
-__device__ Color Renderer::trace(const Ray &ray, curandState* r_state)
+__device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
+                                       Ray* ray_stack, int* hit_index_stack, Color* color_stack)
 {
     // Transform recursive method into interative
-    Ray ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
-    int hit_index_stack[allocating_size] = { -1 }  ;
-    Color color_stack[allocating_size] = {Color(0.0f)};
+    //Ray ray_stack[allocating_size] = { Ray(ray.origin, ray.direction) };
+    //int hit_index_stack[allocating_size] = { -1 };
+    bool refraction_ray_stack[allocating_size] = { true };
+    //Color color_stack[allocating_size] = {Color(0.0f)};
     ray_stack[0] = ray;
     hit_index_stack[0] = 0;
     int threshold_last_depth = 1 << (max_depth_val - 1);
@@ -223,6 +225,11 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state)
     {
         if(hit_index_stack[stack_index / 2 - 1] == -1)
         {
+            continue;
+        }
+        if(!refraction_ray_stack[stack_index / 2 - 1] && stack_index % 2 == 1)
+        {
+            hit_index_stack[stack_index] = -1;
             continue;
         }
 
@@ -263,7 +270,7 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state)
         V.normalize();
 
         // Compute Color with all lights
-        rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
+        rayColor =  Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
 
         if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
         {
@@ -282,6 +289,10 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state)
             continue;
         }
 
+        if(hit->transparency <= 0)
+        {
+            refraction_ray_stack[stack_index] = false;
+        }
 
         float bias = 1e-4f;
         bool inside = false;
@@ -413,17 +424,24 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
 
     // Get local random state
     curandState local_rand_state = random_states[index];
-    
+
+    Ray ray_stack[allocating_size] = { };
+    int hit_index_stack[allocating_size] = {  }  ;
+    Color color_stack[allocating_size] = {};
     // Send a ray through each pixel
     float ds = 1 / (float)renderer->ray_per_pixel;
     for (int s = 0; s < renderer->ray_per_pixel; s++)
     {
         auto r = Vector3::random(&local_rand_state);
 
+        memset(hit_index_stack, -1, sizeof(hit_index_stack));
+        //memset(ray_stack, 0, sizeof(ray_stack));
+        memset(color_stack, 0, sizeof(color_stack));
+        // Sent pixel for traced ray
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        framebuffer[index] += renderer->trace(ray, &local_rand_state) * ds;
+        framebuffer[index] += renderer->trace(ray, &local_rand_state, ray_stack, hit_index_stack, color_stack) * ds;
     }
 
     random_states[index] = local_rand_state;
