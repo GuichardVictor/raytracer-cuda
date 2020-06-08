@@ -9,7 +9,7 @@ public:
         : origin{_origin}, direction{_direction}
     {}
 
-    __host__ __device__ Ray() = default;
+    Ray() = default;
 
 public:
     Vector3 origin;
