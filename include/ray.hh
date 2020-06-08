@@ -9,6 +9,8 @@ public:
         : origin{_origin}, direction{_direction}
     {}
 
+    __host__ __device__ Ray() = default;
+
 public:
     Vector3 origin;
     Vector3 direction;
