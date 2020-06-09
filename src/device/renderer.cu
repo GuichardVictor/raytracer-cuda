@@ -303,7 +303,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     return (reflectionColor * hit->reflectivity) + (refractionColor * hit->transparency);
 }
 
-__device__ void simple_scene(Scene** scene_ptr)
 
 __device__ Shape* Triangle::copy_to_sm(void** sm_pointer)
 {
@@ -442,9 +441,17 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
     *memSize = sm_memSize;
 }
 
-__global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)
+__global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandState* random_states)
 {
-    auto renderer = *renderer_ptr;
+    extern __shared__ float sm_pointer[];
+
+    Renderer* sm_renderer = (Renderer*)sm_pointer;
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) // Only one thread per block
+		sm_renderer = copy_renderer_to_sm(*g_renderer, (void**)&sm_pointer);
+    __syncthreads();
+
+    auto renderer = sm_renderer;
 
     int x = threadIdx.x + blockIdx.x * blockDim.x;
     int y = threadIdx.y + blockIdx.y * blockDim.y;

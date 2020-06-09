@@ -50,14 +50,23 @@ int main()
     Camera** camera;
     checkCudaErrors(cudaMalloc((void **)&camera, sizeof(Camera*)));
 
-    setupScene<<<1,1>>>(renderer, scene, camera, width, height);
+
+    // Scene Setup
+    std::cerr << "Scene setup.." << std::endl;
+    size_t* sm_memSize;
+    checkCudaErrors(cudaMallocManaged((void **)&sm_memSize, sizeof(size_t)));
+    setupScene<<<1,1>>>(renderer, scene, camera, width, height, sm_memSize);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
+    std::cerr << "  sm_memSize: " << *sm_memSize << std::endl;
+    *sm_memSize = *sm_memSize * 3;
+
 
     // Setting Up Rendering
     dim3 blocks(width/tx+1,height/ty+1);
     dim3 threads(tx,ty);
 
+    std::cerr << "Random init..." << std::endl;
     random_init<<<blocks, threads>>>(width, height, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
@@ -70,7 +79,7 @@ int main()
     clock_t start, stop;
     start = clock();
 
-    renderScene<<<blocks, threads>>>(frameBuffer, renderer, d_rand_state);
+    renderScene<<<blocks, threads, *sm_memSize>>>(frameBuffer, renderer, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 

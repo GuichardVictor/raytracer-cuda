@@ -28,4 +28,7 @@ public:
     int ray_per_pixel;
 };
 
-__global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states);__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, size_t* sm_memSize);
+__device__ Renderer* copy_renderer_to_sm(Renderer* g_renderer, void** sm_pointer);
+
+__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, size_t* sm_memSize);
+__global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandState* random_states);
