@@ -1,0 +1,20 @@
+# Cuda Iterative Test Benchmark
+
+create:
+    name: "cuda-iterative"
+    local: 'C:\\Users\\Victor\\Desktop\\CUDA-projects\\GPGPU\\gpgu-2021'
+
+setup:
+    steps:
+        - enter: FOLDER
+        - cmd: mkdir build
+        - enter: build
+        - cmd: cmake ..
+        - cmd: cmake --build . --config Release
+run:
+    exec: raytracer-cuda.exe
+    args: ""
+    steps:
+        - enter: FOLDER
+        - enter: build/Release
+        - runcmd: ''

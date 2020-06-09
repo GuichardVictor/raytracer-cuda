@@ -1,0 +1,21 @@
+# Cuda Base Line Test Benchmark
+
+create:
+    name: "cpu-baseline"
+    repository: "git@github.com:GuichardVictor/gpgu-2021.git"
+    tag: "cpu-baseline"
+
+setup:
+    steps:
+        - enter: FOLDER
+        - cmd: mkdir build
+        - enter: build
+        - cmd: cmake .. -G "MinGW Makefiles"
+        - cmd: cmake --build . --config Release
+run:
+    exec: raytracer.exe
+    args: ""
+    steps:
+        - enter: FOLDER
+        - enter: build
+        - runcmd: ''
