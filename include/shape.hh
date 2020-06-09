@@ -11,6 +11,7 @@ class Shape
 public:
     __device__ virtual bool intersect(const Ray& ray, float& t0, float& t1) = 0;
     __device__ virtual Vector3 getNormal(const Vector3&) { return Vector3(); };
+    __device__ virtual Shape* copy_to_sm(void** sm_pointer) = 0;
 
 public:
     Color color;               // Surface Diffuse Color
@@ -49,6 +50,7 @@ public:
     // Compute a ray-sphere intersection using the geometric method
     __device__ virtual bool intersect(const Ray& ray, float& t0, float& t1) override;
     __device__ Vector3 getNormal(const Vector3 &hitPosition) override;
+    __device__ virtual Shape* copy_to_sm(void** sm_pointer) override;
 
 public:
     Vector3 center;
@@ -79,6 +81,7 @@ public:
 
     __device__ bool intersect(const Ray& ray, float& t, float&);
     __device__ Vector3 getNormal(const Vector3&);
+    __device__ virtual Shape* copy_to_sm(void** sm_pointer) override;
 
 public:
     Vector3 v0;

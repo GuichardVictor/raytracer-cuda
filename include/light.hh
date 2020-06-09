@@ -27,6 +27,22 @@ public:
 
     __device__ virtual float attenuate(const float) const { return 1.0; };
 
+    __device__ virtual Light* copy_to_sm(void** sm_pointer)
+    {
+        Light* light = (Light*)(*sm_pointer);
+        *sm_pointer = (void*)(light + 1);
+
+        light->position = position;
+        light->intensity = intensity;
+        light->type = type;
+
+        light->samples = samples;
+        light->width = width;
+        light->height = height;
+
+        return light;
+    }
+
 public:
     Vector3 position;
     Vector3 intensity;
