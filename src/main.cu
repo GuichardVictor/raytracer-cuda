@@ -67,7 +67,7 @@ int main()
     dim3 threads(tx,ty);
 
     std::cerr << "Random init..." << std::endl;
-    random_init<<<blocks, threads>>>(width, height, d_rand_state);
+    //random_init<<<blocks, threads>>>(width, height, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 

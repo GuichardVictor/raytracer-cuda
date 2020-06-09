@@ -27,21 +27,7 @@ public:
 
     __device__ virtual float attenuate(const float) const { return 1.0; };
 
-    __device__ virtual Light* copy_to_sm(void** sm_pointer)
-    {
-        Light* light = (Light*)(*sm_pointer);
-        *sm_pointer = (void*)(light + 1);
-
-        light->position = position;
-        light->intensity = intensity;
-        light->type = type;
-
-        light->samples = samples;
-        light->width = width;
-        light->height = height;
-
-        return light;
-    }
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) = 0;
 
 public:
     Vector3 position;
@@ -65,6 +51,8 @@ public:
     { type = Light::Type::Ambient; }
 
     __device__ float attenuate(const float) const override { return 1.0f; }
+
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) override;
 };
 
 class DirectionalLight : public Light
@@ -79,6 +67,8 @@ public:
     { type = Light::Type::Directional; }
     
     __device__ float attenuate(const float) const override { return 1.0; }
+
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) override;
 };
 
 class PointLight : public Light
@@ -93,6 +83,8 @@ public:
     { type = Light::Type::Point; }
 
     __device__ float attenuate(const float r) const override { return 1.0 / (r * r); }
+
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) override;
 };
 
 class SpotLight : public Light
@@ -108,6 +100,8 @@ public:
 
     __device__ float attenuate(const float) const override { return 1.0; }
     __device__ float attenuate(const Vector3& Vobj, const Vector3& Vlight) const { return Vobj.dot(Vlight); }
+
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) override;
 };
 
 class AreaLight : public Light
@@ -132,4 +126,6 @@ public:
     }
 
     __device__ float attenuate(const float) const override { return 1.0; }
+
+    __device__ virtual void* copy_to_sm(Light** sm_lights, int i, void* sm_pointer) override;
 };

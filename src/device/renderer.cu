@@ -303,54 +303,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     return (reflectionColor * hit->reflectivity) + (refractionColor * hit->transparency);
 }
 
-
-__device__ Shape* Triangle::copy_to_sm(void** sm_pointer)
-{
-    Triangle* triangle = (Triangle*)(*sm_pointer);
-    *sm_pointer = (void*)(triangle + 1);
-
-    triangle->color = color;
-    triangle->color_specular = color_specular;
-    triangle->ka = ka;
-    triangle->kd = kd;
-    triangle->ks = ks;
-    triangle->shininess = shininess;
-    triangle->reflectivity = reflectivity;
-    triangle->transparency = transparency;
-    triangle->glossiness = glossiness;
-    triangle->glossy_transparency = glossy_transparency;
-
-    triangle->v0 = v0;
-    triangle->v1 = v1;
-    triangle->v2 = v2;
-
-    return triangle;
-}
-
-__device__ Shape* Sphere::copy_to_sm(void** sm_pointer)
-{
-    Sphere* sphere = (Sphere*)(*sm_pointer);
-    *sm_pointer = (void*)(sphere + 1);
-
-    sphere->color = color;
-    sphere->color_specular = color_specular;
-    sphere->ka = ka;
-    sphere->kd = kd;
-    sphere->ks = ks;
-    sphere->shininess = shininess;
-    sphere->reflectivity = reflectivity;
-    sphere->transparency = transparency;
-    sphere->glossiness = glossiness;
-    sphere->glossy_transparency = glossy_transparency;
-
-    sphere->center = center;
-    sphere->radius = radius;
-
-
-    return sphere;
-}
-
-
 __device__ size_t simple_scene(Scene** scene_ptr)
 {
     size_t sm_memSize = 0;
@@ -448,7 +400,7 @@ __global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandSta
     Renderer* sm_renderer = (Renderer*)sm_pointer;
 
     if (threadIdx.x == 0 && threadIdx.y == 0) // Only one thread per block
-		sm_renderer = copy_renderer_to_sm(*g_renderer, (void**)&sm_pointer);
+		sm_renderer = copy_renderer_to_sm(*g_renderer, (void*)sm_pointer);
     __syncthreads();
 
     auto renderer = sm_renderer;
