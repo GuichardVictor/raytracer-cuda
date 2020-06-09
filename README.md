@@ -59,6 +59,10 @@ create:
 * `setup/steps/enter`: update working directory
 * `setup/steps/cmd`: run command
 
+Special Variable:
+
+* `FOLDER`: root of project
+
 ### Run
 
 * `run/exec`: executable
@@ -68,6 +72,9 @@ create:
 * `run/steps/cmd`: run command
 * `run/steps/runcmd`: will run the executable (if given value: "{value} {exec} {args}" ex: python exec.py --help)
 
+Special Variable:
+
+* `FOLDER`: root of project
 
 ## Disclosure
 
