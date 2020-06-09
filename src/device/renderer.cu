@@ -305,22 +305,31 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
 
 __device__ void simple_scene(Scene** scene_ptr)
 {
+__device__ size_t simple_scene(Scene** scene_ptr)
+{
+    size_t sm_memSize = 0;
+
     *scene_ptr = new Scene();
+    sm_memSize += sizeof(Scene);
 
     auto scene = *scene_ptr;
 
     size_t object_count = 11;
     Shape** objects = new Shape*[object_count];
+    sm_memSize += sizeof(Shape*) * object_count;
 
     Triangle* t0 = new Triangle( Vector3(0, -3, 0), Vector3(1, -5, 0), Vector3(-1, -5, 0), Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0);
     Triangle* t1 = new Triangle( Vector3(0, 4, -40), Vector3(10, -4, -40), Vector3(-10, -4, -40), Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0);
+    sm_memSize += sizeof(Triangle) * 2;
 
     Sphere* ts0 = new Sphere(Vector3(0, 4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
     Sphere* ts1 = new Sphere(Vector3(5, -4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
     Sphere* ts2 = new Sphere(Vector3(-5, -4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
+    sm_memSize += sizeof(Sphere) * 3;
 
     Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0); // Black - Bottom Surface
     Sphere* s1 = new Sphere(Vector3(0, 0, 20), 4, Color(165, 10, 14), 0.3, 0.8, 0.5, 128.0, 0.05, 0.95); // Clear
+    sm_memSize += sizeof(Sphere) * 2;
 
     s1->glossy_transparency = 0.02f;
     s1->glossiness = 0.05;
@@ -331,6 +340,7 @@ __device__ void simple_scene(Scene** scene_ptr)
     Sphere* s4 = new Sphere( Vector3(-3.5, -1, 10), 2, Color(8, 88, 56), 0.4, 0.6, 0.5, 64.0, 1.0); // Green
     s4->glossiness = 0.3;
     Sphere* s5 = new Sphere( Vector3(-5.5, 0, 15), 3, Color(51, 51, 51), 0.3, 0.8, 0.25, 32.0, 0.0); // Black
+    sm_memSize += sizeof(Sphere) * 4;
 
     // Add spheres to scene
     objects[0] = ts0;
@@ -351,26 +361,38 @@ __device__ void simple_scene(Scene** scene_ptr)
 
     size_t light_count = 2;
     Light** lights = new Light*[light_count];
+    sm_memSize += sizeof(Light*) * light_count;
 
     AreaLight* l0 = new AreaLight( Vector3(0, 20, 35), Vector3(1.4) );
     AreaLight* l1 = new AreaLight( Vector3(20, 20, 35), Vector3(1.8) );
     //DirectionalLight l2 = DirectionalLight( Vector3(0, 20, 35), Vector3(1.4) );
     //PointLight* l3 = new PointLight( Vector3(20, 20, 35), Vector3(2.0) );
+    sm_memSize += sizeof(AreaLight) * 2;
 
     lights[0] = l0;
     lights[1] = l1;
 
     scene->objects = new Array<Shape>((Shape**)objects, object_count);
     scene->lights = new Array<Light>((Light**)lights, light_count);
+    sm_memSize += sizeof(Array<Shape>);
+    sm_memSize += sizeof(Array<Light>);
+
+    return sm_memSize;
 }
 
-__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height)
+__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, size_t* memSize)
 {
-    simple_scene(scene);
+    size_t sm_memSize;
+    sm_memSize = simple_scene(scene);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
+    sm_memSize += sizeof(Camera);
+
     *renderer = new Renderer(width, height, *scene, *cam, 3);
+    sm_memSize += sizeof(Renderer);
+
+    *memSize = sm_memSize;
 }
 
 __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)
