@@ -12,7 +12,7 @@ class Renderer {
 
 public:
     __host__ __device__
-    Renderer(int _width, int _height, Scene* _scene, Camera* _camera, int _max_ray_depth=5, int _ray_per_pixel=10)
+    Renderer(int _width, int _height, Scene* _scene, Camera* _camera, int _max_ray_depth=5, int _ray_per_pixel=5)
         : width(_width), height(_height), scene(_scene), camera(_camera), max_ray_depth(_max_ray_depth), ray_per_pixel(_ray_per_pixel)
     {}
 

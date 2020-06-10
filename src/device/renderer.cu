@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_DEPTH 1
-#define max_depth_val 7
+#define max_depth_val 5
 #define allocating_size (1 << (max_depth_val))
 
 namespace Lighting
@@ -211,7 +211,8 @@ __device__ Vector3 Sphere::getNormal(const Vector3& hitPosition)
 
 
 __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
-                                       Ray* ray_stack, int* hit_index_stack, Color* color_stack)
+                                       Ray* ray_stack, int* hit_index_stack,
+                                       Color* color_stack)
 {
     // Transform recursive method into interative
 
@@ -224,6 +225,13 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
         int parent_index = stack_index / 2;
         if(hit_index_stack[parent_index] == -1)
         {
+            continue;
+        }
+
+        //refraction ray in no transparent object
+        if(hit_index_stack[stack_index] == -2)
+        {
+            hit_index_stack[stack_index] = -1;
             continue;
         }
 
@@ -283,6 +291,11 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
             continue;
         }
 
+        if(hit->transparency <= 0)
+        {
+            hit_index_stack[2 * stack_index + 1] = -2;
+        }
+
         float bias = 1e-4f;
         bool inside = false;
 
@@ -297,6 +310,7 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
         R.normalize();
 
         Ray rRay(hitPoint + N * bias, R);
+
 
         // Compute Refracted Ray (transmission ray) and Color
         float ni = 1.0;
@@ -444,7 +458,7 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
 {
     //simple_scene(scene);
     curandState local_rand_state = random_states[0];
-    random_sphere_scene(scene, 100, &local_rand_state);
+    random_sphere_scene(scene, 1000, &local_rand_state);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
