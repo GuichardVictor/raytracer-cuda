@@ -70,13 +70,13 @@ Scene random_sphere_scene(int nb_sphere)
 
     for(int i = 0; i < nb_sphere; i++)
     {
-        float r = ((double) rand() / (RAND_MAX)) + 1;
-        float g = ((double) rand() / (RAND_MAX)) + 1;
-        float b = ((double) rand() / (RAND_MAX)) + 1;
-        float coef = ((double) rand() / (RAND_MAX)) + 1;
-        float x = ((double) rand() / (RAND_MAX)) + 1;
-        float y = ((double) rand() / (RAND_MAX)) + 1;
-        float z = ((double) rand() / (RAND_MAX)) + 1;
+        float r = ((double) rand() / (RAND_MAX));
+        float g = ((double) rand() / (RAND_MAX));
+        float b = ((double) rand() / (RAND_MAX));
+        float coef = ((double) rand() / (RAND_MAX));
+        float x = ((double) rand() / (RAND_MAX));
+        float y = ((double) rand() / (RAND_MAX));
+        float z = ((double) rand() / (RAND_MAX));
         Vector3 center{-11 + x * 22, -3 + y * 10, 5 + z * 15};
         Sphere tmp =  Sphere(center, coef, Color(r * 255, g * 255, b * 255), 0.2, 0.5, 0.0, 128, (i % 5 == 0));
         scene.addObject(std::make_shared<Sphere>(tmp));
@@ -130,13 +130,13 @@ int main(int argc, char* argv[])
     int height = 720;
     float fov = 30.0;
 
-    int raysPerPixels = 10;
-    int max_ray_depth = 7;
+    int raysPerPixels = 5;
+    int max_ray_depth = 5;
 
     // Create Scene
     std::cout << "Creating Scene: ";
     //auto scene = simple_scene();
-    auto scene = random_sphere_scene(100);
+    auto scene = random_sphere_scene(1000);
     std::cout << scene.objects.size() << " objects" << std::endl;
 
     // Create Camera
