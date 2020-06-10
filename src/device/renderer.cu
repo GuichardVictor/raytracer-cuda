@@ -303,6 +303,51 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     return (reflectionColor * hit->reflectivity) + (refractionColor * hit->transparency);
 }
 
+__device__ void random_sphere_scene(Scene** scene_ptr, int nb_sphere, curandState* r_state)
+{
+    *scene_ptr = new Scene();
+
+    auto scene = *scene_ptr;
+
+    size_t object_count = 1 + nb_sphere;
+    Shape** objects = new Shape*[object_count];
+
+    for(int i = 0; i < nb_sphere; i++)
+    {
+        float r = curand_uniform(r_state);
+        float g = curand_uniform(r_state);
+        float b = curand_uniform(r_state);
+        float coef = curand_uniform(r_state);
+        float x = curand_uniform(r_state);
+        float y = curand_uniform(r_state);
+        float z = curand_uniform(r_state);
+        Vector3 center{-11 + x * 22, -3 + y * 10, 5 + z * 15};
+        Vector3 add = Vector3::random(r_state);
+        objects[i] =  new Sphere(center, coef, Color(r * 255, g * 255, b * 255), 0.2, 0.5, 0.0, 128, (i % 5 == 0));
+    }
+    
+    Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0); // Black - Bottom Surface
+    objects[object_count - 1] = s0;
+
+
+    // Add light to scene
+    scene->setAmbientLight(AmbientLight(Vector3(1.0)));
+    scene->setBackgroundColor(Color(0.0f));
+
+    size_t light_count = 2;
+    Light** lights = new Light*[light_count];
+
+    AreaLight* l0 = new AreaLight( Vector3(0, 20, 35), Vector3(1.4) );
+    AreaLight* l1 = new AreaLight( Vector3(20, 20, 35), Vector3(1.8) );
+
+    lights[0] = l0;
+    lights[1] = l1;
+
+   
+
+    scene->objects = new Array<Shape>((Shape**)objects, object_count);
+    scene->lights = new Array<Light>((Light**)lights, light_count);
+}
 __device__ void simple_scene(Scene** scene_ptr)
 {
     *scene_ptr = new Scene();
@@ -364,13 +409,15 @@ __device__ void simple_scene(Scene** scene_ptr)
     scene->lights = new Array<Light>((Light**)lights, light_count);
 }
 
-__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height)
+__global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, curandState * random_states)
 {
-    simple_scene(scene);
+    //simple_scene(scene);
+    curandState local_rand_state = random_states[0];
+    random_sphere_scene(scene, 100, &local_rand_state);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
-    *renderer = new Renderer(width, height, *scene, *cam, 3);
+    *renderer = new Renderer(width, height, *scene, *cam, 5);
 }
 
 __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)

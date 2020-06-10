@@ -50,10 +50,6 @@ int main()
     Camera** camera;
     checkCudaErrors(cudaMalloc((void **)&camera, sizeof(Camera*)));
 
-    setupScene<<<1,1>>>(renderer, scene, camera, width, height);
-    checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
-
     // Setting Up Rendering
     dim3 blocks(width/tx+1,height/ty+1);
     dim3 threads(tx,ty);
@@ -61,6 +57,12 @@ int main()
     random_init<<<blocks, threads>>>(width, height, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
+
+
+    setupScene<<<1,1>>>(renderer, scene, camera, width, height, d_rand_state);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+
 
     // Render our buffer
 
@@ -85,7 +87,7 @@ int main()
         for (int i = 0; i < width; i++) {
             size_t pixel_index = j * width + i;
             auto color = frameBuffer[pixel_index];
-            //color = color.clamp();
+            color = color.clamp();
             int ir = int(color.r);
             int ig = int(color.g);
             int ib = int(color.b);
