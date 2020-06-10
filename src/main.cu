@@ -50,10 +50,6 @@ int main()
     Camera** camera;
     checkCudaErrors(cudaMalloc((void **)&camera, sizeof(Camera*)));
 
-    setupScene<<<1,1>>>(renderer, scene, camera, width, height);
-    checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
-
     // Setting Up Rendering
     dim3 blocks(width/tx+1,height/ty+1);
     dim3 threads(tx,ty);
@@ -62,7 +58,13 @@ int main()
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
+
+
+    setupScene<<<1,1>>>(renderer, scene, camera, width, height, d_rand_state);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
     // Render our buffer
+
 
     std::cerr << "Rendering a " << width << "x" << height << " image with ";
     std::cerr << "in " << tx << "x" << ty << " blocks." << std::endl;
