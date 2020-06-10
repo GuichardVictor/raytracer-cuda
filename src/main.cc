@@ -1,4 +1,5 @@
 #include <chrono>
+#include <stdlib.h>
 
 #include "scene.hh"
 #include "renderer.hh"
@@ -60,6 +61,43 @@ Scene simple_scene()
 }
 
 
+Scene random_sphere_scene(int nb_sphere)
+{
+    Scene scene = Scene();
+    scene.backgroundColor = Color();
+
+    srand(8080);
+
+    for(int i = 0; i < nb_sphere; i++)
+    {
+        float r = ((double) rand() / (RAND_MAX)) + 1;
+        float g = ((double) rand() / (RAND_MAX)) + 1;
+        float b = ((double) rand() / (RAND_MAX)) + 1;
+        float coef = ((double) rand() / (RAND_MAX)) + 1;
+        float x = ((double) rand() / (RAND_MAX)) + 1;
+        float y = ((double) rand() / (RAND_MAX)) + 1;
+        float z = ((double) rand() / (RAND_MAX)) + 1;
+        Vector3 center{-11 + x * 22, -3 + y * 10, 5 + z * 15};
+        Sphere tmp =  Sphere(center, coef, Color(r * 255, g * 255, b * 255), 0.2, 0.5, 0.0, 128, (i % 5 == 0));
+        scene.addObject(std::make_shared<Sphere>(tmp));
+    }
+    
+    Sphere s0 = Sphere(Vector3(0, -10004, 20), 10000, Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0); // Black - Bottom Surface
+    scene.addObject(std::make_shared<Sphere>(s0));
+
+
+    AreaLight l0 = AreaLight( Vector3(0, 20, 35), Vector3(1.4) );
+    AreaLight l1 = AreaLight( Vector3(20, 20, 35), Vector3(1.8) );
+
+    scene.addLight(std::make_shared<Light>(l0));
+    scene.addLight(std::make_shared<Light>(l1));
+
+    return scene;
+}
+
+
+
+
 Scene object_scene(const std::string& file)
 {
     auto objects = ObjParser::parse_file(file);
@@ -92,13 +130,13 @@ int main(int argc, char* argv[])
     int height = 720;
     float fov = 30.0;
 
-    int raysPerPixels = 1;
-    int max_ray_depth = 3;
+    int raysPerPixels = 10;
+    int max_ray_depth = 7;
 
     // Create Scene
     std::cout << "Creating Scene: ";
-    auto scene = simple_scene();
-
+    //auto scene = simple_scene();
+    auto scene = random_sphere_scene(100);
     std::cout << scene.objects.size() << " objects" << std::endl;
 
     // Create Camera
