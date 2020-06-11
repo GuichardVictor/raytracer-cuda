@@ -2,6 +2,7 @@
 #include "image.hh"
 
 #include <iostream>
+#include<omp.h>
 
 int Renderer::MAX_RAY_DEPTH = 5;
 
@@ -9,17 +10,15 @@ void Renderer::render()
 {
     Color *pixels = new Color[width * height];
 
-    for (int y = 0; y < height; y++)
+    for (int index = 0; index < height * width; index++)
     {
-        for (int x = 0; x < width; x++)
-        {
-            int index = y * width + x;
-            // Send a ray through each pixel
-            Vector3 rayDirection = camera.pixelToViewport( Vector3(x, y, 1) );
-            Ray ray(camera.position, rayDirection);
-            // Sent pixel for traced ray
-            pixels[index] = trace(ray, 0);
-        }
+        int x = index % width;
+        int y = index / width;
+        // Send a ray through each pixel
+        Vector3 rayDirection = camera.pixelToViewport( Vector3(x, y, 1) );
+        Ray ray(camera.position, rayDirection);
+        // Sent pixel for traced ray
+        pixels[index] = trace(ray, 0);
     }
 
     Image::save("out.ppm", width, height, pixels);
@@ -32,25 +31,25 @@ void Renderer::renderAntiAliasing(int samples)
 
     Color *pixels = new Color[width * height];
 
-    for (int y = 0; y < height; y++)
+    #pragma omp parallel for
+    for (int index = 0; index < height * width; index++)
     {
-        for (int x = 0; x < width; x++)
+        int x = index % width;
+        int y = index / width;
+
+        for (int s = 0; s < samples; s++)
         {
-            for (int s = 0; s < samples; s++)
-            {
-                Vector3 r = Vector3::random();
-                float jx = x + r.x;
-                float jy = y + r.y;
-                int index = y * width + x;
+            Vector3 r = Vector3::random();
+            float jx = x + r.x;
+            float jy = y + r.y;
 
-                // Send a jittered ray through each pixel
-                Vector3 rayDirection = camera.pixelToViewport( Vector3(jx, jy, 1) );
+            // Send a jittered ray through each pixel
+            Vector3 rayDirection = camera.pixelToViewport( Vector3(jx, jy, 1) );
 
-                Ray ray(camera.position, rayDirection);
+            Ray ray(camera.position, rayDirection);
 
-                // Sent pixel for traced ray
-                pixels[index] += trace(ray, 0) * inv_samples;
-            } 
+            // Sent pixel for traced ray
+            pixels[index] += trace(ray, 0) * inv_samples;
         }
     }
 
