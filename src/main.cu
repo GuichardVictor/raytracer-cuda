@@ -95,6 +95,8 @@ int main()
         }
     }
     
+    free_scene<<<1,1>>>(renderer);
+
     // Free render buffers
     checkCudaErrors(cudaFree(d_rand_state));
     checkCudaErrors(cudaFree(frameBuffer));
