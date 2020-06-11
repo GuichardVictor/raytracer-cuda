@@ -94,6 +94,8 @@ int main()
             file << ir << " " << ig << " " << ib << "\n";
         }
     }
+
+    free_scene<<<1,1>>>(renderer);
     
     // Free render buffers
     checkCudaErrors(cudaFree(d_rand_state));
