@@ -140,11 +140,11 @@ namespace Lighting
 
 __device__ Ray Camera::pixelToViewport(const Vector3& pixel)
 {
-    float invWidth = 1 / (float)width;
-    float invHeight = 1 / (float)height;
+    float invWidth = 1.f / (float)width;
+    float invHeight = 1.f / (float)height;
 
-    float vx = (2 * ((pixel.x + 0.5) * invWidth) - 1) * angle * aspectRatio;
-    float vy = (1 - 2 * ((pixel.y + 0.5) * invHeight)) * angle;
+    float vx = (2.f * ((pixel.x + 0.5f) * invWidth) - 1.f) * angle * aspectRatio;
+    float vy = (1.f - 2.f * ((pixel.y + 0.5f) * invHeight)) * angle;
 
     Vector3 rayDirection  = Vector3(vx, vy, pixel.z);
     rayDirection.rotateX(angleX);
@@ -198,7 +198,7 @@ __device__ bool Sphere::intersect(const Ray& ray, float& t0, float& t1)
     float d2 = l.dot(l) - tca*tca;
     if (d2 > (radius * radius))
         return false; // Ray doesn't intersect
-    float thc = sqrt((radius * radius)- d2); // Closest approach to surface of sphere
+    float thc = sqrtf((radius * radius)- d2); // Closest approach to surface of sphere
     t0 = tca - thc;
     t1 = tca + thc;
     return true;
