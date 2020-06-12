@@ -22,8 +22,8 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 int main()
 {
     // Render Settings
-    int width = 10;
-    int height = 10;
+    int width = 1280;
+    int height = 720;
 
     // Cuda Settings
     int tx = 8; // BlockX size
@@ -51,15 +51,7 @@ int main()
     checkCudaErrors(cudaMalloc((void **)&camera, sizeof(Camera*)));
 
 
-    // Scene Setup
-    std::cerr << "Scene setup.." << std::endl;
-    size_t* sm_memSize;
-    checkCudaErrors(cudaMallocManaged((void **)&sm_memSize, sizeof(size_t)));
-    setupScene<<<1,1>>>(renderer, scene, camera, width, height, sm_memSize);
-    checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
-    std::cerr << "  sm_memSize: " << *sm_memSize << std::endl;
-    *sm_memSize = *sm_memSize * 3;
+
 
 
     // Setting Up Rendering
@@ -70,6 +62,17 @@ int main()
     random_init<<<blocks, threads>>>(width, height, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
+
+
+    // Scene Setup
+    std::cerr << "Scene setup.." << std::endl;
+    size_t* sm_memSize;
+    checkCudaErrors(cudaMallocManaged((void **)&sm_memSize, sizeof(size_t)));
+    setupScene<<<1,1>>>(renderer, scene, camera, width, height, sm_memSize, d_rand_state);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+    std::cerr << "  sm_memSize: " << *sm_memSize << std::endl;
+    *sm_memSize = *sm_memSize * 3;
 
     // Render our buffer
 
@@ -94,7 +97,7 @@ int main()
         for (int i = 0; i < width; i++) {
             size_t pixel_index = j * width + i;
             auto color = frameBuffer[pixel_index];
-            //color = color.clamp();
+            color = color.clamp();
             int ir = int(color.r);
             int ig = int(color.g);
             int ib = int(color.b);
