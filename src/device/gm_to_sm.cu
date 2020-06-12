@@ -93,7 +93,6 @@ __device__ void* Sphere::copy_to_sm(Shape** sm_shapes, int i, void* sm_pointer)
 
 __device__ void* copy_lights_to_sm(Scene* sm_scene, Array<Light>* g_lights, void* sm_pointer)
 {
-	printf("lights copy\n");
     Array<Light>* sm_lights = (Array<Light>*)sm_pointer;
     sm_pointer = (void*)(sm_lights + 1);
 
@@ -105,7 +104,6 @@ __device__ void* copy_lights_to_sm(Scene* sm_scene, Array<Light>* g_lights, void
 	for (int i = 0; i < g_lights->count; i++) {
 		sm_pointer = g_lights->list[i]->copy_to_sm(sm_lights->list, i, sm_pointer);
 	}
-	printf("~lights copy\n");
 	sm_scene->lights = sm_lights;
 	return sm_pointer;
 }
@@ -115,7 +113,6 @@ __device__ void* copy_lights_to_sm(Scene* sm_scene, Array<Light>* g_lights, void
   **/
 __device__ void* copy_shapes_to_sm(Scene* sm_scene, Array<Shape>* g_shapes, void* sm_pointer)
 {
-	printf("shapes copy\n");
     Array<Shape>* sm_shapes = (Array<Shape>*)sm_pointer;
     sm_pointer = (void*)(sm_shapes + 1);
 
@@ -129,14 +126,12 @@ __device__ void* copy_shapes_to_sm(Scene* sm_scene, Array<Shape>* g_shapes, void
 	for (int i = 0; i < g_shapes->count; i++) {
 		sm_pointer = g_shapes->list[i]->copy_to_sm(sm_shapes->list, i, sm_pointer);
 	}
-	printf("~shapes copy\n");
 	sm_scene->objects = sm_shapes;
 	return sm_pointer;
 }
 
 __device__ void* copy_scene_to_sm(Renderer* sm_renderer, Scene* g_scene, void* sm_pointer)
 {
-	printf("scene copy\n");
     Scene* sm_scene = (Scene*)sm_pointer;
     sm_pointer = (void*)(sm_scene + 1);
 
@@ -146,14 +141,12 @@ __device__ void* copy_scene_to_sm(Renderer* sm_renderer, Scene* g_scene, void* s
 	sm_pointer = copy_shapes_to_sm(sm_scene, g_scene->objects, sm_pointer);
 	sm_pointer = copy_lights_to_sm(sm_scene, g_scene->lights, sm_pointer);
 
-	printf("~scene copy\n");
 	sm_renderer->scene = sm_scene;
     return sm_pointer;
 }
 
 __device__ void* copy_camera_to_sm(Renderer* sm_renderer, Camera* g_camera, void* sm_pointer)
 {
-	printf("camera copy\n");
 	Camera* sm_camera = (Camera*)sm_pointer;
 	sm_pointer = (void*)(sm_camera + 1);
 
@@ -169,7 +162,6 @@ __device__ void* copy_camera_to_sm(Renderer* sm_renderer, Camera* g_camera, void
 	sm_camera->angleY = g_camera->angleY;
 	sm_camera->angleZ = g_camera->angleZ;
 
-	printf("~camera copy\n");
 	sm_renderer->camera = sm_camera;
 	return sm_pointer;
 }
@@ -178,25 +170,19 @@ __device__ void* copy_camera_to_sm(Renderer* sm_renderer, Camera* g_camera, void
 
 __device__ Renderer* copy_renderer_to_sm(Renderer* g_renderer, void* sm_pointer)
 {
-	printf("renderer copy\n");
 
     Renderer* sm_renderer = (Renderer*)sm_pointer;
     sm_pointer = (void*)(sm_renderer + 1);
-	printf("here 1\n");
 
     sm_renderer->width = g_renderer->width;
     sm_renderer->height = g_renderer->height;
-	printf("here 2\n");
 
 	sm_pointer = copy_scene_to_sm(sm_renderer, g_renderer->scene, sm_pointer);
-	printf("here 3\n");
 
 	sm_pointer = copy_camera_to_sm(sm_renderer, g_renderer->camera, sm_pointer);
-	printf("here 4\n");
 
     sm_renderer->max_ray_depth = g_renderer->max_ray_depth;
     sm_renderer->ray_per_pixel = g_renderer->ray_per_pixel;
 
-	printf("~renderer copy\n");
 	return sm_renderer;
 }
