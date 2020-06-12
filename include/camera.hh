@@ -3,8 +3,9 @@
 #include "vector3.hh"
 #include "ray.hh"
 
+#ifndef M_PI
 #define M_PI 3.141592653f
-
+#endif
 class Camera
 {
 

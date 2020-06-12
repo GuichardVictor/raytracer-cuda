@@ -22,8 +22,8 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 int main()
 {
     // Render Settings
-    int width = 1280;
-    int height = 720;
+    int width = 10;
+    int height = 10;
 
     // Cuda Settings
     int tx = 8; // BlockX size
@@ -102,6 +102,8 @@ int main()
         }
     }
     
+    free_scene<<<1,1>>>(renderer);
+
     // Free render buffers
     checkCudaErrors(cudaFree(d_rand_state));
     checkCudaErrors(cudaFree(frameBuffer));

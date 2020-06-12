@@ -91,7 +91,7 @@ __host__ __device__ inline float Vector3::length2() const
 
 __host__ __device__ inline  float Vector3::length() const
 {
-    return sqrt(length2());
+    return sqrtf(length2());
 }
 
 __host__ __device__ inline  Vector3& Vector3::normalize()
@@ -99,7 +99,7 @@ __host__ __device__ inline  Vector3& Vector3::normalize()
     float norm2 = length2();
     if(norm2 > 0)
     {
-        float invNorm = 1 / sqrt(norm2);
+        float invNorm = 1 / sqrtf(norm2);
         x *= invNorm, y *= invNorm, z *= invNorm;
     }
     return *this;
@@ -111,8 +111,8 @@ __host__ __device__ inline Vector3& Vector3::rotateX(const float angle)
     float _y = y;
     float _z = z;
 
-    y = _y * std::cos(angle) - _z * std::sin(angle);
-    z = _y * std::sin(angle) + _z * std::cos(angle);
+    y = _y * cosf(angle) - _z * sinf(angle);
+    z = _y * sinf(angle) + _z * cosf(angle);
     return *this;
 }
 
@@ -121,8 +121,8 @@ __host__ __device__ inline Vector3& Vector3::rotateY(const float angle)
     float _x = x;
     float _z = z;
 
-    x = _z * std::sin(angle) + _x * std::cos(angle);
-    z = _z * std::cos(angle) - _x * std::sin(angle);
+    x = _z * sinf(angle) + _x * cosf(angle);
+    z = _z * cosf(angle) - _x * sinf(angle);
     return *this;
 }
 
@@ -130,7 +130,7 @@ __host__ __device__ inline Vector3& Vector3::rotateZ(const float angle)
 {
     float _x = x;
 
-    x = _x * std::cos(angle) - y * std::sin(angle);
-    y = _x * std::sin(angle) + y * std::cos(angle);
+    x = _x * cosf(angle) - y * sinf(angle);
+    y = _x * sinf(angle) + y * cosf(angle);
     return *this;
 }
