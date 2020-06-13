@@ -3,7 +3,7 @@
 create:
     name: "cpu-baseline"
     repository: "git@github.com:GuichardVictor/gpgu-2021.git"
-    tag: "cpu-baseline"
+    tag: "cpu"
 
 setup:
     steps:

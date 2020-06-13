@@ -1,21 +1,21 @@
 # Cuda Base Line Test Benchmark
 
 create:
-    name: "cuda-baseline"
+    name: "cpu-omp"
     repository: "git@github.com:GuichardVictor/gpgu-2021.git"
-    tag: "cuda"
+    tag: "cpu-omp"
 
 setup:
     steps:
         - enter: FOLDER
         - cmd: mkdir build
         - enter: build
-        - cmd: cmake ..
+        - cmd: cmake .. -G "MinGW Makefiles"
         - cmd: cmake --build . --config Release
 run:
-    exec: raytracer-cuda.exe
+    exec: raytracer.exe
     args: ""
     steps:
         - enter: FOLDER
-        - enter: build/Release
+        - enter: build
         - runcmd: ''

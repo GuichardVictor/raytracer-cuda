@@ -1,9 +1,9 @@
 # Cuda Base Line Test Benchmark
 
 create:
-    name: "cuda-baseline"
+    name: "cuda-iterative"
     repository: "git@github.com:GuichardVictor/gpgu-2021.git"
-    tag: "cuda"
+    tag: "feat-iterative"
 
 setup:
     steps:
