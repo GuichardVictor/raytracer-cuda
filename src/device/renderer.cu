@@ -452,7 +452,7 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
 {
     //simple_scene(scene);
     curandState local_rand_state = random_states[0];
-    random_sphere_scene(scene, 100, &local_rand_state);
+    random_sphere_scene(scene, 1000, &local_rand_state);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
