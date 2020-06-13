@@ -242,12 +242,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     // Compute Color with all lights
     rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
 
-    if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-    {
-        printf("|ERROR|");
-        //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-    }
-
     float bias = 1e-4f;
     bool inside = false;
 
@@ -274,16 +268,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
 
     if (hit->transparency <= 0)
     {
-        if (isnan(reflectionColor.r) || isnan(reflectionColor.g) || isnan(reflectionColor.b))
-        {
-            printf("|ERROR REFLECTION|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-        }
-        if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-        {
-            printf("|~~ABCDEFGH~~|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-        }
         return rayColor + (reflectionColor * hit->reflectivity);
     }
 
