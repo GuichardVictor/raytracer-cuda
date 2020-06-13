@@ -4,6 +4,7 @@
 #include "light.hh"
 #include "color.hh"
 #include "array.hh"
+#include "texture.hh"
 
 class Scene
 {
@@ -25,6 +26,7 @@ public:
 public:
     Array<Shape>* objects;
     Array<Light>* lights;
+    Texture* textures;
 
     Color backgroundColor;
     AmbientLight ambientLight;

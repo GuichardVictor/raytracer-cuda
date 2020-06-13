@@ -12,10 +12,11 @@
 namespace Lighting
 {
     __device__ Color getLightingAll(const Shape& object, const Vector3& point,
-                                    const Vector3& normal, const Vector3& view,
-                                    Array<Light>* lights,
-                                    Array<Shape>* objects,
-                                    curandState* r_state);
+									const Vector3& normal, const Vector3& view,
+									Array<Light>* lights,
+									Array<Shape>* objects,
+									curandState* r_state,
+									Texture* textures);
     
     __device__  bool getShadow(const Vector3& point, const Light& light,
                                Array<Shape>* objects);
@@ -25,6 +26,6 @@ namespace Lighting
 
 
     __device__ Color getLighting(const Shape& object, const Vector3& point,
-                                 const Vector3& normal, const Vector3& view,
-                                 Light* light);
+								const Vector3& normal, const Vector3& view,
+								Light* light, Texture* textures);
 } // namespace Lighting;

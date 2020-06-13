@@ -72,7 +72,7 @@ int main()
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     std::cerr << "  sm_memSize: " << *sm_memSize << std::endl;
-    *sm_memSize = *sm_memSize * 3;
+    *sm_memSize = *sm_memSize + 100;
 
     // Render our buffer
 

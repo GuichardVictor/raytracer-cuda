@@ -10,17 +10,18 @@ namespace Lighting
                                     const Vector3& normal, const Vector3& view,
                                     Array<Light>* lights,
                                     Array<Shape>* objects,
-                                    curandState* r_state)
+                                    curandState* r_state,
+                                    Texture* textures)
     {
-        Color ambient = object.color;
-        Color rayColor = ambient * object.ka;
+        Color ambient = textures[object.textureID].color;
+        Color rayColor = ambient * textures[object.textureID].ka;
 
         // Compute illumination with shadows
         for (size_t i = 0; i < lights->count; i++)
         {
             auto light = lights->list[i];
             float shadowFactor = getShadowFactor(point, *light, objects, r_state);
-            rayColor += getLighting(object, point, normal, view, light) * (1.0 - shadowFactor);
+            rayColor += getLighting(object, point, normal, view, light, textures) * (1.0 - shadowFactor);
         }
 
         return rayColor;
@@ -101,7 +102,7 @@ namespace Lighting
 
     __device__ Color getLighting(const Shape& object, const Vector3& point,
             const Vector3& normal, const Vector3& view,
-            Light* light)
+            Light* light, Texture* textures)
     {
         Color rayColor;
 
@@ -115,19 +116,19 @@ namespace Lighting
 
         float NdotL = N.dot(L);
         float intensity = fmaxf(0.0f, NdotL);
-        Color diffuse = object.color * light->intensity * intensity * attenuate;
+        Color diffuse = textures[object.textureID].color * light->intensity * intensity * attenuate;
 
         // Create specular color
         Vector3 V = view;
         Vector3 H = L + V;
         H.normalize();
 
-        float shinniness = object.shininess;
+        float shinniness = textures[object.textureID].shininess;
         float NdotH = N.dot(H);
         float specularIntensity = powf(fmaxf(0.0f, NdotH), shinniness);
-        Color specular = object.color_specular * light->intensity * specularIntensity * attenuate;
+        Color specular = textures[object.textureID].color_specular * light->intensity * specularIntensity * attenuate;
 
-        rayColor = diffuse * object.kd + specular * object.ks;   
+        rayColor = diffuse * textures[object.textureID].kd + specular * textures[object.textureID].ks;   
 
         return rayColor;
     }
@@ -205,7 +206,7 @@ __device__ Vector3 Sphere::getNormal(const Vector3& hitPosition)
     return (hitPosition - center) / radius;
 }
 
-__device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state)
+__device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state, Texture* textures)
 {
     // Transform recursive method into interative
     Color rayColor = Color(0.0f);
@@ -240,7 +241,7 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     V.normalize();
 
     // Compute Color with all lights
-    rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
+    rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state, textures);
 
     float bias = 1e-4f;
     bool inside = false;
@@ -252,23 +253,23 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     }
 
     // not transparent or depth == MAX RAY DEPTH
-    if ((hit->transparency <= 0 && hit->reflectivity <= 0) || depth >= max_ray_depth)
+    if ((textures[hit->textureID].transparency <= 0 && textures[hit->textureID].reflectivity <= 0) || depth >= max_ray_depth)
     {
         return rayColor;
     }
 
     // Compute Reflection Ray and Color 
     Vector3 R = ray.direction - N * 2 * ray.direction.dot(N);
-    R = R + Vector3::random(r_state) * hit->glossiness;
+    R = R + Vector3::random(r_state) * textures[hit->textureID].glossiness;
     R.normalize();
 
     Ray rRay(hitPoint + N * bias, R);
-    Color reflectionColor = trace(rRay, depth + 1, r_state); //* VdotR;
+    Color reflectionColor = trace(rRay, depth + 1, r_state, textures); //* VdotR;
     Color refractionColor = Color();
 
-    if (hit->transparency <= 0)
+    if (textures[hit->textureID].transparency <= 0)
     {
-        return rayColor + (reflectionColor * hit->reflectivity);
+        return rayColor + (reflectionColor * textures[hit->textureID].reflectivity);
     }
 
     // Compute Refracted Ray (transmission ray) and Color
@@ -279,23 +280,28 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     float costheta = - N.dot(ray.direction);
     float k = 1 - nit * nit * (1 - costheta * costheta);
     Vector3 T = ray.direction * nit + N * (nit * costheta - sqrtf(k));
-    T = T + Vector3::random(r_state) * hit->glossy_transparency;
+    T = T + Vector3::random(r_state) * textures[hit->textureID].glossy_transparency;
     T.normalize();
 
     Ray refractionRay(hitPoint - N * bias, T);
-    refractionColor = trace(refractionRay, depth + 1, r_state);
-    return (reflectionColor * hit->reflectivity) + (refractionColor * hit->transparency);
+    refractionColor = trace(refractionRay, depth + 1, r_state, textures);
+    return (reflectionColor * textures[hit->textureID].reflectivity) + (refractionColor * textures[hit->textureID].transparency);
 }
 
 __device__ size_t random_sphere_scene(Scene** scene_ptr, int nb_sphere, curandState* r_state)
 {
     size_t sm_memSize = 0;
     *scene_ptr = new Scene();
+    sm_memSize += sizeof(Scene);
 
     auto scene = *scene_ptr;
 
     size_t object_count = 1 + nb_sphere;
     Shape** objects = new Shape*[object_count];
+    sm_memSize += sizeof(Shape*) * object_count;
+
+    scene->textures = new Texture[object_count];
+    Texture* textures = scene->textures;
 
     for(int i = 0; i < nb_sphere; i++)
     {
@@ -308,10 +314,12 @@ __device__ size_t random_sphere_scene(Scene** scene_ptr, int nb_sphere, curandSt
         float z = curand_uniform(r_state);
         Vector3 center{-11 + x * 22, -3 + y * 10, 5 + z * 15};
         Vector3 add = Vector3::random(r_state);
-        objects[i] =  new Sphere(center, coef, Color(r * 255, g * 255, b * 255), 0.2, 0.5, 0.0, 128, (i % 5 == 0));
+        textures[i] = Texture(Color(r * 255, g * 255, b * 255), 0.2, 0.5, 0.0, 128, (i % 5 == 0));
+        objects[i] =  new Sphere(center, coef, i);
     }
     
-    Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0); // Black - Bottom Surface
+    textures[object_count - 1] = Texture(Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0);
+    Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, object_count - 1); // Black - Bottom Surface
     objects[object_count - 1] = s0;
 
     sm_memSize += sizeof(Sphere) * object_count;
@@ -352,31 +360,53 @@ __device__ size_t simple_scene(Scene** scene_ptr)
     auto scene = *scene_ptr;
 
     size_t object_count = 11;
+
+    scene->textures = new Texture[object_count];
+    Texture* textures = scene->textures;
+
     Shape** objects = new Shape*[object_count];
     sm_memSize += sizeof(Shape*) * object_count;
 
-    Triangle* t0 = new Triangle( Vector3(0, -3, 0), Vector3(1, -5, 0), Vector3(-1, -5, 0), Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0);
-    Triangle* t1 = new Triangle( Vector3(0, 4, -40), Vector3(10, -4, -40), Vector3(-10, -4, -40), Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0);
+    textures[0] = Texture(Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0); 
+    Triangle* t0 = new Triangle( Vector3(0, -3, 0), Vector3(1, -5, 0), Vector3(-1, -5, 0), 0);
+    textures[1] = Texture( Color(165, 10, 14), 1.0, 0.5, 0.0, 128.0, 0.0);
+    Triangle* t1 = new Triangle( Vector3(0, 4, -40), Vector3(10, -4, -40), Vector3(-10, -4, -40), 1);
     sm_memSize += sizeof(Triangle) * 2;
 
-    Sphere* ts0 = new Sphere(Vector3(0, 4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
-    Sphere* ts1 = new Sphere(Vector3(5, -4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
-    Sphere* ts2 = new Sphere(Vector3(-5, -4, 30), 0.2, Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
+    textures[2] = Texture(Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);;
+    Sphere* ts0 = new Sphere(Vector3(0, 4, 30), 0.2, 2);
+
+    textures[3] = Texture(Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
+    Sphere* ts1 = new Sphere(Vector3(5, -4, 30), 0.2, 3);
+
+    textures[4] = Texture(Color(255), 0.3, 0.8, 0.5, 128.0, 1.0);
+    Sphere* ts2 = new Sphere(Vector3(-5, -4, 30), 0.2, 4);
     sm_memSize += sizeof(Sphere) * 3;
 
-    Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0); // Black - Bottom Surface
-    Sphere* s1 = new Sphere(Vector3(0, 0, 20), 4, Color(165, 10, 14), 0.3, 0.8, 0.5, 128.0, 0.05, 0.95); // Clear
+    textures[5] = Texture(Color(51, 51, 51), 0.2, 0.5, 0.0, 128.0, 0.0);
+    Sphere* s0 = new Sphere(Vector3(0, -10004, 20), 10000, 5); // Black - Bottom Surface
+
+    textures[6] = Texture(Color(165, 10, 14), 0.3, 0.8, 0.5, 128.0, 0.05, 0.95);
+    Sphere* s1 = new Sphere(Vector3(0, 0, 20), 4, 6); // Clear
     sm_memSize += sizeof(Sphere) * 2;
 
-    s1->glossy_transparency = 0.02f;
-    s1->glossiness = 0.05;
-    Sphere* s2 = new Sphere( Vector3(5, -1, 15), 2, Color(235, 179, 41), 0.4, 0.6, 0.4, 128.0, 1.0); // Yellow
-    s2->glossiness = 0.2;
-    Sphere* s3 = new Sphere( Vector3(5, 0, 25), 3, Color(6, 72, 111), 0.3, 0.8, 0.1, 128.0, 1.0);  // Blue
-    s3->glossiness = 0.4;
-    Sphere* s4 = new Sphere( Vector3(-3.5, -1, 10), 2, Color(8, 88, 56), 0.4, 0.6, 0.5, 64.0, 1.0); // Green
-    s4->glossiness = 0.3;
-    Sphere* s5 = new Sphere( Vector3(-5.5, 0, 15), 3, Color(51, 51, 51), 0.3, 0.8, 0.25, 32.0, 0.0); // Black
+    textures[6].glossy_transparency = 0.02f;
+    textures[6].glossiness = 0.05;
+
+    textures[7] = Texture(Color(235, 179, 41), 0.4, 0.6, 0.4, 128.0, 1.0);
+    Sphere* s2 = new Sphere( Vector3(5, -1, 15), 2, 7); // Yellow
+    textures[7].glossiness = 0.2;
+
+    textures[8] = Texture(Color(6, 72, 111), 0.3, 0.8, 0.1, 128.0, 1.0);
+    Sphere* s3 = new Sphere( Vector3(5, 0, 25), 3, 8);  // Blue
+    textures[8].glossiness = 0.4;
+
+    textures[9] = Texture(Color(8, 88, 56), 0.4, 0.6, 0.5, 64.0, 1.0);
+    Sphere* s4 = new Sphere( Vector3(-3.5, -1, 10), 2, 9); // Green
+    textures[9].glossiness = 0.3;
+
+    textures[10] = Texture(Color(51, 51, 51), 0.3, 0.8, 0.25, 32.0, 0.0);
+    Sphere* s5 = new Sphere( Vector3(-5.5, 0, 15), 3, 10); // Black
     sm_memSize += sizeof(Sphere) * 4;
 
     // Add spheres to scene
@@ -465,7 +495,7 @@ __global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandSta
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        pixelColor += renderer->trace(ray, 0, &local_rand_state) * ds;
+        pixelColor += renderer->trace(ray, 0, &local_rand_state, renderer->scene->textures) * ds;
     }
 
     framebuffer[index] = pixelColor;

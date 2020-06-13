@@ -121,8 +121,6 @@ __device__ void* copy_shapes_to_sm(Scene* sm_scene, Array<Shape>* g_shapes, void
 	sm_shapes->list = (Shape**)sm_pointer;
 	sm_pointer = (void*)(sm_shapes->list + g_shapes->count);
 
-	float t0 = INFINITY;
-	float t1 = INFINITY;
 	for (int i = 0; i < g_shapes->count; i++) {
 		sm_pointer = g_shapes->list[i]->copy_to_sm(sm_shapes->list, i, sm_pointer);
 	}
@@ -137,6 +135,7 @@ __device__ void* copy_scene_to_sm(Renderer* sm_renderer, Scene* g_scene, void* s
 
     sm_scene->backgroundColor = g_scene->backgroundColor;
     sm_scene->ambientLight = g_scene->ambientLight;
+    sm_scene->textures = g_scene->textures;
 
 	sm_pointer = copy_shapes_to_sm(sm_scene, g_scene->objects, sm_pointer);
 	sm_pointer = copy_lights_to_sm(sm_scene, g_scene->lights, sm_pointer);
