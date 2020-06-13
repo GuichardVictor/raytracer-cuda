@@ -397,11 +397,11 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
 {
     //simple_scene(scene);
     curandState local_rand_state = random_states[0];
-    random_sphere_scene(scene, 100, &local_rand_state);
+    random_sphere_scene(scene, 1000, &local_rand_state);
     
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
-    (*cam)->angleX = 30f * (M_PI / 180f);
+    (*cam)->angleX = 30 * (M_PI / 180);
     *renderer = new Renderer(width, height, *scene, *cam, 5, 5);
     
     random_states[0] = local_rand_state;
@@ -419,6 +419,8 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
 
     // Get local random state
     curandState local_rand_state = random_states[index];
+
+    Color pixelColor = Color(0.0f, 0.0f, 0.0f);
     
     // Send a ray through each pixel
     float ds = 1 / (float)renderer->ray_per_pixel;
@@ -429,8 +431,10 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        framebuffer[index] += renderer->trace(ray, 0, &local_rand_state) * ds;
+        pixelColor += renderer->trace(ray, 0, &local_rand_state) * ds;
     }
+
+    framebuffer[index] = pixelColor;
 
     random_states[index] = local_rand_state;
 }
