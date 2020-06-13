@@ -274,12 +274,6 @@ __device__ Color Renderer::trace(const Ray &ray, curandState* r_state,
         // Compute Color with all lights
         rayColor =  Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
 
-        if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-        {
-            printf("|ERROR|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-        }
-
         color_stack[stack_index] = rayColor;
 
         
@@ -456,14 +450,14 @@ __device__ void simple_scene(Scene** scene_ptr)
 
 __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, curandState* random_states)
 {
-    simple_scene(scene);
-    //curandState local_rand_state = random_states[0];
-    //random_sphere_scene(scene, 1000, &local_rand_state);
+    //simple_scene(scene);
+    curandState local_rand_state = random_states[0];
+    random_sphere_scene(scene, 100, &local_rand_state);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
-    *renderer = new Renderer(width, height, *scene, *cam, 7);
-    //random_states[0] = local_rand_state;
+    *renderer = new Renderer(width, height, *scene, *cam, 5, 5);
+    random_states[0] = local_rand_state;
 }
 
 __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)
@@ -482,6 +476,8 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
     Ray ray_stack[allocating_size] = { };
     int hit_index_stack[allocating_size] = {  }  ;
     Color color_stack[allocating_size] = {};
+
+    Color pixelColor = Color(0.0f, 0.0f, 0.0f);
     // Send a ray through each pixel
     float ds = 1 / (float)renderer->ray_per_pixel;
     for (int s = 0; s < renderer->ray_per_pixel; s++)
@@ -495,8 +491,10 @@ __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandS
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        framebuffer[index] += renderer->trace(ray, &local_rand_state, ray_stack, hit_index_stack, color_stack) * ds;
+        pixelColor += renderer->trace(ray, &local_rand_state, ray_stack, hit_index_stack, color_stack) * ds;
     }
+
+    framebuffer[index] = pixelColor;
 
     random_states[index] = local_rand_state;
 }

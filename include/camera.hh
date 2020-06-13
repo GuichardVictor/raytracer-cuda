@@ -4,7 +4,7 @@
 #include "ray.hh"
 
 #ifndef M_PI
-#define M_PI 3.141693
+#define M_PI 3.141693f
 #endif
 
 
