@@ -411,14 +411,16 @@ __device__ void simple_scene(Scene** scene_ptr)
 
 __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int width, int height, curandState * random_states)
 {
-    simple_scene(scene);
-    //curandState local_rand_state = random_states[0];
-    //random_sphere_scene(scene, 100, &local_rand_state);
+    //simple_scene(scene);
+    curandState local_rand_state = random_states[0];
+    random_sphere_scene(scene, 100, &local_rand_state);
+    
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
-    (*cam)->angleX = 30 * (M_PI / 180);
-    *renderer = new Renderer(width, height, *scene, *cam, 5);
-    //random_states[0] = local_rand_state;
+    (*cam)->angleX = 30f * (M_PI / 180f);
+    *renderer = new Renderer(width, height, *scene, *cam, 5, 5);
+    
+    random_states[0] = local_rand_state;
 }
 
 __global__ void renderScene(Color* framebuffer, Renderer** renderer_ptr, curandState* random_states)
