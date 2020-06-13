@@ -242,12 +242,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
     // Compute Color with all lights
     rayColor = Lighting::getLightingAll(*hit, hitPoint, N, V, scene->lights, scene->objects, r_state);
 
-    if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-    {
-        printf("|ERROR|");
-        //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-    }
-
     float bias = 1e-4f;
     bool inside = false;
 
@@ -274,16 +268,6 @@ __device__ Color Renderer::trace(const Ray &ray, int depth, curandState* r_state
 
     if (hit->transparency <= 0)
     {
-        if (isnan(reflectionColor.r) || isnan(reflectionColor.g) || isnan(reflectionColor.b))
-        {
-            printf("|ERROR REFLECTION|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-        }
-        if (isnan(rayColor.r) || isnan(rayColor.g) || isnan(rayColor.b))
-        {
-            printf("|~~ABCDEFGH~~|");
-            //printf(" |%f, %f, %f| ", hitPoint.x, hitPoint.y, hitPoint.z);
-        }
         return rayColor + (reflectionColor * hit->reflectivity);
     }
 
@@ -438,7 +422,7 @@ __global__ void setupScene(Renderer** renderer, Scene** scene, Camera** cam, int
     size_t sm_memSize;
     //sm_memSize = simple_scene(scene);
     curandState local_rand_state = random_states[0];
-    sm_memSize = random_sphere_scene(scene, 100, &local_rand_state);
+    sm_memSize = random_sphere_scene(scene, 1000, &local_rand_state);
     float fov = 30.0f;
     *cam = new Camera(Vector3(0, 20, -20), width, height, fov);
     (*cam)->angleX = 30 * (M_PI / 180);
@@ -471,6 +455,7 @@ __global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandSta
     // Get local random state
     curandState local_rand_state = random_states[index];
     
+    Color pixelColor = Color(0.0f, 0.0f, 0.0f);
     // Send a ray through each pixel
     float ds = 1 / (float)renderer->ray_per_pixel;
     for (int s = 0; s < renderer->ray_per_pixel; s++)
@@ -480,8 +465,10 @@ __global__ void renderScene(Color* framebuffer, Renderer** g_renderer, curandSta
         Ray ray = renderer->camera->pixelToViewport(Vector3(x + r.x, y + r.y, 1));
 
         // Sent pixel for traced ray
-        framebuffer[index] += renderer->trace(ray, 0, &local_rand_state) * ds;
+        pixelColor += renderer->trace(ray, 0, &local_rand_state) * ds;
     }
+
+    framebuffer[index] = pixelColor;
 
     random_states[index] = local_rand_state;
 }
